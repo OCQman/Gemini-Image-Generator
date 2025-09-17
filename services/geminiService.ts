@@ -1,34 +1,44 @@
-import { GoogleGenAI } from "@google/genai";
 
-// Use Vite's method for accessing environment variables
-const apiKey = import.meta.env.VITE_API_KEY;
+// IMPORTANT: To use this service, you must set the following environment variables
+// in your Cloudflare Pages project settings:
+// 1. VITE_CLOUDFLARE_ACCOUNT_ID: Your Cloudflare account ID.
+// 2. VITE_CLOUDFLARE_API_TOKEN: An API token with "Workers AI" permissions.
 
-if (!apiKey) {
-  throw new Error("VITE_API_KEY environment variable is not set. Please set it in your Cloudflare Pages settings.");
+const accountId = import.meta.env.VITE_CLOUDFLARE_ACCOUNT_ID;
+const apiToken = import.meta.env.VITE_CLOUDFLARE_API_TOKEN;
+
+const model = '@cf/stabilityai/stable-diffusion-xl-base-1.0';
+
+if (!accountId || !apiToken) {
+  throw new Error("Cloudflare Account ID and API Token must be set as environment variables.");
 }
 
-const ai = new GoogleGenAI({ apiKey });
-
 export const generateImage = async (prompt: string): Promise<string> => {
+  const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
+
   try {
-    const response = await ai.models.generateImages({
-        model: 'imagen-4.0-generate-001',
-        prompt: prompt,
-        config: {
-          numberOfImages: 1,
-          outputMimeType: 'image/jpeg',
-          aspectRatio: '1:1',
-        },
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ prompt }),
     });
 
-    if (response.generatedImages && response.generatedImages.length > 0) {
-      const base64ImageBytes: string = response.generatedImages[0].image.imageBytes;
-      return `data:image/jpeg;base64,${base64ImageBytes}`;
-    } else {
-      throw new Error("No images were generated.");
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to generate image. Status: ${response.status}. Message: ${errorText}`);
     }
+
+    // The response is the image binary data
+    const imageBlob = await response.blob();
+    
+    // Create a temporary URL for the blob to display in an <img> tag
+    return URL.createObjectURL(imageBlob);
+
   } catch (error) {
-    console.error("Error generating image:", error);
+    console.error("Error generating image with Cloudflare AI:", error);
     if (error instanceof Error) {
       throw new Error(`Failed to generate image: ${error.message}`);
     }

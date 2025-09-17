@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import ImageGenerator from './components/ImageGenerator';
 import Footer from './components/Footer';
@@ -10,9 +10,23 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    // This is a cleanup function to revoke the object URL and prevent memory leaks.
+    return () => {
+      if (imageUrl && imageUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(imageUrl);
+      }
+    };
+  }, [imageUrl]);
+
   const handleGenerateImage = async (prompt: string) => {
     setIsLoading(true);
     setError(null);
+
+    // Revoke the previous blob URL if it exists
+    if (imageUrl && imageUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(imageUrl);
+    }
     setImageUrl(null);
 
     try {
