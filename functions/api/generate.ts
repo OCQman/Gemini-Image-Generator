@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import type { PagesFunction } from "@cloudflare/workers-types";
 
 // Define the shape of the environment variables available to the function
 interface Env {
@@ -14,9 +15,7 @@ interface RequestBody {
  * Cloudflare Pages Function handler for POST requests.
  * This function acts as a secure proxy to the Google Gemini API.
  */
-// FIX: Corrected the function signature to resolve "Cannot find name 'PagesFunction'"
-// and migrated the implementation to use the Google Gemini API for image generation.
-export const onRequestPost: (context: { request: Request; env: Env }) => Promise<Response> = async (context) => {
+export const onRequestPost: PagesFunction<Env> = async (context) => {
   try {
     const { request, env } = context;
     const body: RequestBody = await request.json();
