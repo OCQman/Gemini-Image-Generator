@@ -1,9 +1,7 @@
-export const generateImage = async (prompt: string): Promise<string> => {
-  // The frontend now calls our own serverless function, which will securely call the Cloudflare API.
-  const url = '/api/generate';
 
+export const generateImage = async (prompt: string): Promise<string> => {
   try {
-    const response = await fetch(url, {
+    const response = await fetch('/api/generate', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -11,23 +9,24 @@ export const generateImage = async (prompt: string): Promise<string> => {
       body: JSON.stringify({ prompt }),
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to generate image. Server said: ${errorText}`);
+      // If the server responded with an error, use its message
+      throw new Error(data.error || 'An unknown error occurred from the server.');
     }
 
-    // The response from our function is the image binary data
-    const imageBlob = await response.blob();
-    
-    // Create a temporary URL for the blob to display in an <img> tag
-    return URL.createObjectURL(imageBlob);
-
+    if (data.imageUrl) {
+      return data.imageUrl;
+    } else {
+      throw new Error("Server did not return an image URL.");
+    }
   } catch (error) {
-    console.error("Error calling backend function:", error);
+    console.error("Error calling image generation API:", error);
     if (error instanceof Error) {
-      // Re-throw a more user-friendly error
-      throw new Error(`Request failed: ${error.message}`);
+      // Re-throw the error with a more user-friendly prefix.
+      throw new Error(`Failed to generate image: ${error.message}`);
     }
-    throw new Error("An unknown error occurred while generating the image.");
+    throw new Error("An unknown error occurred while communicating with the server.");
   }
 };
