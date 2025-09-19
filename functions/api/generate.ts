@@ -2,7 +2,7 @@
 // Cloudflare Pages Function to securely proxy image generation requests.
 // This runs on the server, not in the user's browser.
 
-import { GoogleGenAI } from "https://aistudiocdn.com/@google/genai@^1.20.0";
+import { GoogleGenAI } from "https://esm.sh/@google/genai";
 
 export async function onRequestPost(context) {
   try {
