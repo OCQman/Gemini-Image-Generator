@@ -1,5 +1,5 @@
 {
-  "name": "Cloudflare AI Image Generator",
-  "description": "A modern web application that generates images from text prompts using Cloudflare Workers AI. Enter a keyword or a descriptive phrase to create a unique AI-generated picture.",
+  "name": "Gemini Image Generator",
+  "description": "A modern web application that generates images from text prompts using the Google Gemini API. Enter a keyword or a descriptive phrase to create a unique AI-generated picture.",
   "requestFramePermissions": []
 }
