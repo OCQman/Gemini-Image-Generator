@@ -1,70 +1,64 @@
-import { GoogleGenAI } from "@google/genai";
-import type { PagesFunction } from "@cloudflare/workers-types";
+// @ts-nocheck
+// Cloudflare Pages Function to securely proxy image generation requests.
+// This runs on the server, not in the user's browser.
 
-// Define the shape of the environment variables available to the function
-interface Env {
-  API_KEY: string;
-}
+import { GoogleGenAI } from "https://aistudiocdn.com/@google/genai@^1.20.0";
 
-// Define the shape of the incoming request body from the frontend
-interface RequestBody {
-  prompt: string;
-}
-
-/**
- * Cloudflare Pages Function handler for POST requests.
- * This function acts as a secure proxy to the Google Gemini API.
- */
-export const onRequestPost: PagesFunction<Env> = async (context) => {
+export async function onRequestPost(context) {
   try {
     const { request, env } = context;
-    const body: RequestBody = await request.json();
-    const prompt = body.prompt;
 
-    if (!prompt) {
-      return new Response('Prompt is required in the request body.', { status: 400 });
+    // IMPORTANT: 'API_KEY' must be set as an environment variable in your
+    // Cloudflare Pages project settings. It should be bound to your secret.
+    if (!env.API_KEY) {
+      const errorResponse = { error: 'Server configuration error: API key not found.' };
+      return new Response(JSON.stringify(errorResponse), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
-    const apiKey = env.API_KEY;
+    const { prompt } = await request.json();
 
-    if (!apiKey) {
-        console.error("Google Gemini API key (API_KEY) is not configured in the environment.");
-        return new Response("Application is not configured correctly.", { status: 500 });
+    if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
+      const errorResponse = { error: 'A valid text prompt is required.' };
+      return new Response(JSON.stringify(errorResponse), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey: env.API_KEY });
 
-    // Call the Gemini API from the backend function
-    const aiResponse = await ai.models.generateImages({
-      model: 'imagen-4.0-generate-001',
-      prompt: prompt,
-      config: {
-        numberOfImages: 1,
-        outputMimeType: 'image/png',
-        aspectRatio: '1:1',
-      },
+    const apiResponse = await ai.models.generateImages({
+        model: 'imagen-4.0-generate-001',
+        prompt: prompt,
+        config: {
+          numberOfImages: 1,
+          outputMimeType: 'image/jpeg',
+          aspectRatio: '1:1',
+        },
     });
 
-    const base64ImageBytes: string = aiResponse.generatedImages[0].image.imageBytes;
+    if (apiResponse.generatedImages && apiResponse.generatedImages.length > 0) {
+      const base64ImageBytes = apiResponse.generatedImages[0].image.imageBytes;
+      const imageUrl = `data:image/jpeg;base64,${base64ImageBytes}`;
 
-    // Decode base64 to binary. atob is available in the Cloudflare Workers runtime.
-    const binaryString = atob(base64ImageBytes);
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
+      return new Response(JSON.stringify({ imageUrl }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } else {
+      throw new Error("API did not return any images.");
     }
-
-    // Stream the image data directly back to the client
-    return new Response(bytes.buffer, {
-      headers: {
-        'Content-Type': 'image/png',
-      },
-    });
-
   } catch (error) {
-    console.error("Error in Cloudflare function:", error);
-    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-    return new Response(`Internal Server Error: ${errorMessage}`, { status: 500 });
+    console.error("Error in Cloudflare Function:", error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred.";
+
+    const errorResponse = { error: `Image generation failed: ${errorMessage}` };
+    return new Response(JSON.stringify(errorResponse), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
-};
+}
